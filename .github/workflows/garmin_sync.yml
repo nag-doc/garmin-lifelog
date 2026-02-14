@@ -2,8 +2,8 @@ name: Garmin Sync Daily
 
 on:
   schedule:
-    # JST 23:50 (UTC 14:50) に毎日実行
-    - cron: '50 14 * * *'
+    # JST 06:00 (UTC 21:00) に毎日実行
+    - cron: '0 21 * * *'
   workflow_dispatch:
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
       run: |
         pip install garminconnect gspread google-auth
 
-    - name: Run sync script
+    - name: Run sync script (Yesterday & Today)
       env:
         GARMIN_TOKENS: ${{ secrets.GARMIN_TOKENS }}
         SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
