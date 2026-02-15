@@ -2,8 +2,8 @@ name: Garmin Sync Daily
 
 on:
   schedule:
-    # JST 06:00 (UTC 21:00) に毎日実行
-    - cron: '0 21 * * *'
+    # JST 23:55 (UTC 14:55) に毎日実行
+    - cron: '55 14 * * *'
   workflow_dispatch:
 
 jobs:
