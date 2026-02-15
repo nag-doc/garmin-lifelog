@@ -225,7 +225,10 @@ def main():
     vals = worksheet.col_values(1)
     existing = {v: i+1 for i, v in enumerate(vals) if len(v) >= 10}
 
-    targets = [date.today() - timedelta(days=1), date.today()]
+    # targets = [date.today() - timedelta(days=1), date.today()] # これを以下に変更
+
+# 3日前、2日前、1日前、今日 の4日間を対象にする
+    targets = [date.today() - timedelta(days=i) for i in range(3, -1, -1)]
     
     for d_obj in targets:
         d_str = d_obj.isoformat()
