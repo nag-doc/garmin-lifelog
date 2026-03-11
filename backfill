@@ -1,6 +1,7 @@
 # 既存の fetch_day_data 関数の後に追加
 
 
+
 def backfill_vo2max(garmin, worksheet, days_back=30):
     """過去のVO2Maxデータを一括で埋める"""
     print(f"\n=== VO2Maxバックフィル開始（過去{days_back}日分）===\n")
