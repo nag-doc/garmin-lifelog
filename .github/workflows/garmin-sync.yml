@@ -1,0 +1,43 @@
+name: Garmin Data Sync
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 毎日6時
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '実行モード'
+        required: true
+        default: 'daily'
+        type: choice
+        options:
+          - daily
+          - backfill
+          - check
+      days:
+        description: 'バックフィル日数（backfill時）'
+        required: false
+        default: '30'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Install dependencies
+        run: pip install garminconnect gspread google-auth google-auth-oauthlib
+          
+      - name: Run Script
+        env:
+          GARMIN_TOKENS: ${{ secrets.GARMIN_TOKENS }}
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          RUN_MODE: ${{ github.event.inputs.mode || 'daily' }}
+          BACKFILL_DAYS: ${{ github.event.inputs.days || '30' }}
+        run: python garmin_fetch.py
