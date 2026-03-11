@@ -28,7 +28,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.11'
           
       - name: Install dependencies
         run: pip install garminconnect gspread google-auth google-auth-oauthlib
@@ -40,4 +40,6 @@ jobs:
           SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
           RUN_MODE: ${{ github.event.inputs.mode || 'daily' }}
           BACKFILL_DAYS: ${{ github.event.inputs.days || '30' }}
-        run: python fetch_daily.py  # ← garmin_fetch.py から変更
+          HOME: /tmp
+          TMPDIR: /tmp
+        run: python fetch_daily.py
