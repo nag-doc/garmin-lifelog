@@ -22,74 +22,35 @@ def safe_get(func, *args, default=None, **kwargs):
         print(f" (API Error: {e})")
         return default if default is not None else {}
 
-def fetch_vo2max_debug(garmin, date_str):
+def fetch_vo2max(garmin, date_str):
     """
-    VO2Max取得（デバッグ付き）
-    実際のAPIレスポンスをログに出力
+    VO2Maxを取得（リスト形式対応）
     """
     vo2max_run = 0
     vo2max_cycling = 0
-    method_used = "未取得"
     
-    print(f"\n    [VO2Max Debug] 取得開始: {date_str}")
-    
-    # 方法1: get_max_metrics
     try:
         max_metrics = garmin.get_max_metrics(date_str)
         time.sleep(SLEEP_BETWEEN_API)
         
-        print(f"    [VO2Max Debug] Raw response: {json.dumps(max_metrics, indent=2)[:500]}...")
+        # リスト形式の場合、最初の要素を取り出す
+        if isinstance(max_metrics, list) and len(max_metrics) > 0:
+            max_metrics = max_metrics[0]
         
         if isinstance(max_metrics, dict):
-            # すべてのキーを表示
-            print(f"    [VO2Max Debug] Keys: {list(max_metrics.keys())}")
-            
-            # パターンA: 直接 vo2MaxValue
-            if "vo2MaxValue" in max_metrics and max_metrics["vo2MaxValue"]:
-                vo2max_run = max_metrics["vo2MaxValue"]
-                method_used = "direct"
-                print(f"    [VO2Max Debug] Found: vo2MaxValue = {vo2max_run}")
-            
-            # パターンB: generic
-            elif "generic" in max_metrics and isinstance(max_metrics["generic"], dict):
+            # genericキー内を探す
+            if "generic" in max_metrics and isinstance(max_metrics["generic"], dict):
                 generic = max_metrics["generic"]
-                print(f"    [VO2Max Debug] generic keys: {list(generic.keys())}")
-                if generic.get("vo2MaxValue"):
-                    vo2max_run = generic["vo2MaxValue"]
-                    method_used = "generic"
-                    print(f"    [VO2Max Debug] Found in generic: {vo2max_run}")
+                vo2max_run = generic.get("vo2MaxValue") or generic.get("vo2MaxPreciseValue", 0)
             
-            # パターンC: running
-            elif "running" in max_metrics and isinstance(max_metrics["running"], dict):
-                running = max_metrics["running"]
-                if running.get("vo2MaxValue"):
-                    vo2max_run = running["vo2MaxValue"]
-                    method_used = "running"
-            
-            # パターンD: cycling
+            # cyclingも確認
             if "cycling" in max_metrics and isinstance(max_metrics["cycling"], dict):
                 cycling = max_metrics["cycling"]
-                if cycling.get("vo2MaxValue"):
-                    vo2max_cycling = cycling["vo2MaxValue"]
-                    if method_used == "未取得":
-                        method_used = "cycling"
+                vo2max_cycling = cycling.get("vo2MaxValue") or cycling.get("vo2MaxPreciseValue", 0)
                         
     except Exception as e:
-        print(f"    [VO2Max Debug] get_max_metrics error: {e}")
-        traceback.print_exc()
+        print(f" (VO2Max error: {e})", end="")
     
-    # 方法2: 直接API
-    if not vo2max_run:
-        try:
-            print(f"    [VO2Max Debug] Trying direct API...")
-            url = f"/metrics-service/metrics/maxmetrics/{garmin.display_name}"
-            direct_data = garmin.connectapi(url, params={"calendarDate": date_str})
-            time.sleep(SLEEP_BETWEEN_API)
-            print(f"    [VO2Max Debug] Direct API response: {json.dumps(direct_data, indent=2)[:300]}...")
-        except Exception as e:
-            print(f"    [VO2Max Debug] Direct API error: {e}")
-    
-    print(f"    [VO2Max Debug] Result: run={vo2max_run}, cycling={vo2max_cycling}, method={method_used}")
     return vo2max_run, vo2max_cycling
 
 def fetch_day_data(garmin, date_str):
@@ -137,8 +98,8 @@ def fetch_day_data(garmin, date_str):
     vigorous_min = stats.get("vigorousIntensityMinutes", 0) or 0
     intensity_min = moderate_min + vigorous_min
 
-    # VO2Max（デバッグ付き）
-    vo2max, vo2max_cycling = fetch_vo2max_debug(garmin, date_str)
+    # VO2Max取得（リスト形式対応）
+    vo2max, vo2max_cycling = fetch_vo2max(garmin, date_str)
 
     hr = {}
     try:
@@ -208,7 +169,7 @@ def fetch_day_data(garmin, date_str):
         weight_kg = round(w / 1000, 1) if w else 0
         body_fat = round(total_avg.get("bodyFat", 0) or 0, 1)
     
-    print(f" Steps={steps}, Sleep={total_score}, BB={bb_max}, VO2Max={vo2max}")
+    print(f"Steps={steps}, Sleep={total_score}, BB={bb_max}, VO2Max={vo2max}")
     
     return {
         "wakeup_time": wakeup_time, "bed_time": bed_time, "total_score": total_score,
@@ -277,7 +238,6 @@ def backfill_vo2max(garmin, worksheet, days_back=30):
             
         row_num = existing[date_str]
         
-        # 現在の値をチェック
         try:
             current_val = worksheet.cell(row_num, 57).value
             if current_val and str(current_val) not in ["", "0"]:
@@ -287,23 +247,22 @@ def backfill_vo2max(garmin, worksheet, days_back=30):
         except:
             pass
         
-        # VO2Max取得（デバッグ付き）
         try:
-            vo2max, vo2max_cycling = fetch_vo2max_debug(garmin, date_str)
+            vo2max, vo2max_cycling = fetch_vo2max(garmin, date_str)
             
             if vo2max or vo2max_cycling:
                 if vo2max:
                     worksheet.update_cell(row_num, 57, vo2max)
                 if vo2max_cycling:
                     worksheet.update_cell(row_num, 58, vo2max_cycling)
-                print(f"  -> 更新完了")
+                print(f"[{date_str}] VO2Max={vo2max} -> 更新")
                 updated_count += 1
             else:
-                print(f"  -> Garmin上にデータなし")
+                print(f"[{date_str}] Garmin上にデータなし")
                 empty_count += 1
                 
         except Exception as e:
-            print(f"  -> エラー: {e}")
+            print(f"[{date_str}] エラー: {e}")
         
         current += timedelta(days=1)
         time.sleep(0.5)
@@ -324,7 +283,6 @@ def main():
         print("Error: SERVICE_ACCOUNT_JSON missing")
         sys.exit(1)
     
-    # 認証処理（長いトークン対策）
     try:
         if len(token_str) > 1000 and token_str.startswith('{'):
             with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
