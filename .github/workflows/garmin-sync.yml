@@ -40,4 +40,4 @@ jobs:
           SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
           RUN_MODE: ${{ github.event.inputs.mode || 'daily' }}
           BACKFILL_DAYS: ${{ github.event.inputs.days || '30' }}
-        run: python garmin_fetch.py
+        run: python fetch_daily.py  # ← garmin_fetch.py から変更
