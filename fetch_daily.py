@@ -256,3 +256,42 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+def debug_vo2max(garmin, date_str="2024-03-10"):  # テストしたい日付に変更
+    """VO2Max取得のデバッグ"""
+    print(f"\n=== VO2Maxデバッグ: {date_str} ===")
+    
+    # 方法1: get_max_metrics を試す
+    try:
+        max_metrics = garmin.get_max_metrics(date_str)
+        print(f"【get_max_metrics 結果】")
+        print(f"型: {type(max_metrics)}")
+        print(f"内容: {json.dumps(max_metrics, indent=2, ensure_ascii=False) if isinstance(max_metrics, dict) else max_metrics}")
+        
+        if isinstance(max_metrics, dict):
+            # 可能なキーをすべて表示
+            print(f"含まれるキー: {list(max_metrics.keys())}")
+            
+            # 一般的なキーをチェック
+            for key in ["vo2MaxValue", "vo2Max", "maxMetrics", "value", "generic", "cycling", "running"]:
+                if key in max_metrics:
+                    print(f"  → {key}: {max_metrics[key]}")
+    except Exception as e:
+        print(f"【get_max_metrics エラー】{e}")
+        import traceback
+        traceback.print_exc()
+    
+    # 方法2: 内部APIを直接叩く（代替案）
+    try:
+        print(f"\n【直接API呼び出しテスト】")
+        url = f"/metrics-service/metrics/maxmetrics/{garmin.display_name}"
+        params = {"calendarDate": date_str}
+        direct_data = garmin.connectapi(url, params=params)
+        print(f"直接API結果: {json.dumps(direct_data, indent=2, ensure_ascii=False) if isinstance(direct_data, dict) else direct_data}")
+    except Exception as e:
+        print(f"直接APIエラー: {e}")
+
+# main() の最後に追加してテスト
+debug_vo2max(garmin, "2025-03-10")  # 実際のデータがある日付に変更
