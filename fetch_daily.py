@@ -17,7 +17,7 @@ def safe_get(func, *args, default=None, **kwargs):
         time.sleep(SLEEP_BETWEEN_API)
         return result if result is not None else (default if default is not None else {})
     except Exception as e:
-        print(f"    (API Error: {e})")
+        print(f" (API Error: {e})")
         return default if default is not None else {}
 
 def fetch_day_data(garmin, date_str):
@@ -68,9 +68,25 @@ def fetch_day_data(garmin, date_str):
     moderate_min = stats.get("moderateIntensityMinutes", 0) or 0
     vigorous_min = stats.get("vigorousIntensityMinutes", 0) or 0
     intensity_min = moderate_min + vigorous_min
-    vo2max = stats.get("currentVO2Max", 0) or 0
 
-    # 3. Heart Rate
+    # 3. VO2Max - 専用メソッドを使用
+    vo2max = 0
+    vo2max_cycling = 0
+    try:
+        max_metrics = garmin.get_max_metrics(date_str)
+        time.sleep(SLEEP_BETWEEN_API)
+        if isinstance(max_metrics, dict):
+            # ランニングVO2Max
+            vo2max = max_metrics.get("vo2MaxValue", 0) or 0
+            # サイクリングVO2Max（存在する場合）
+            vo2max_cycling = max_metrics.get("vo2MaxValueCycling", 0) or 0
+            # どちらも取得できない場合は汎用フィールドを確認
+            if not vo2max and not vo2max_cycling:
+                vo2max = max_metrics.get("vo2Max", 0) or 0
+    except Exception as e:
+        print(f" (VO2Max Error: {e})")
+
+    # 4. Heart Rate
     hr = {}
     try:
         url = f"/wellness-service/wellness/dailyHeartRate/{garmin.display_name}"
@@ -86,7 +102,7 @@ def fetch_day_data(garmin, date_str):
     valid_hr = [v[1] for v in hr_values if isinstance(v, (list, tuple)) and len(v) > 1 and v[1] and v[1] > 0]
     avg_hr = round(sum(valid_hr) / len(valid_hr)) if valid_hr else 0
 
-    # 4. Body Battery
+    # 5. Body Battery
     bb_max = bb_min = 0
     try:
         bb_data = garmin.get_body_battery(date_str) or []
@@ -105,20 +121,20 @@ def fetch_day_data(garmin, date_str):
     except Exception:
         pass
 
-    # 5. Stress
+    # 6. Stress
     stress = safe_get(garmin.get_stress_data, date_str, default={})
     if not isinstance(stress, dict): stress = {}
     stress_avg = stress.get("overallStressLevel", 0) or 0
     stress_max = stress.get("maxStressLevel", 0) or 0
 
-    # 6. SpO2
+    # 7. SpO2
     spo2 = safe_get(garmin.get_spo2_data, date_str, default={}) or {}
     spo2_avg = 0
     if isinstance(spo2, dict):
         spo2_avg = spo2.get("averageSpO2", 0) or 0
         if not spo2_avg: spo2_avg = spo2.get("lastSevenDaysAvgSPO2", 0) or 0
 
-    # 7. HRV
+    # 8. HRV
     hrv = safe_get(garmin.get_hrv_data, date_str, default={}) or {}
     hrv_value = 0
     if isinstance(hrv, dict):
@@ -126,12 +142,12 @@ def fetch_day_data(garmin, date_str):
         hrv_value = hrv_summary.get("lastNightAvg", 0) or 0
         if not hrv_value: hrv_value = hrv_summary.get("weeklyAvg", 0) or 0
 
-    # 8. Respiration
+    # 9. Respiration
     resp = safe_get(garmin.get_respiration_data, date_str, default={})
     if not isinstance(resp, dict): resp = {}
     resp_avg = resp.get("avgWakingRespirationValue", 0) or 0
 
-    # 9. Body Composition
+    # 10. Body Composition
     body = safe_get(garmin.get_body_composition, date_str, default={}) or {}
     weight_kg = body_fat = 0
     if isinstance(body, dict):
@@ -140,14 +156,15 @@ def fetch_day_data(garmin, date_str):
         weight_kg = round(w / 1000, 1) if w else 0
         body_fat = round(total_avg.get("bodyFat", 0) or 0, 1)
         
-    print(f"Steps={steps}, Sleep={total_score}, BB={bb_max}")
+    print(f"Steps={steps}, Sleep={total_score}, BB={bb_max}, VO2Max={vo2max}")
 
     return {
         "wakeup_time": wakeup_time, "bed_time": bed_time, "total_score": total_score,
         "early_wakeup": 1 if wakeup_time and wakeup_time < "06:00" else 0,
         "deep_min": deep_min, "light_min": light_min, "rem_min": rem_min, "awake_min": awake_min,
         "steps": steps, "distance_km": distance_km, "calories": calories, "active_cal": active_cal,
-        "floors": floors, "intensity_min": intensity_min, "vo2max": vo2max,
+        "floors": floors, "intensity_min": intensity_min, 
+        "vo2max": vo2max, "vo2max_cycling": vo2max_cycling,
         "resting_hr": resting_hr, "max_hr": max_hr, "avg_hr": avg_hr,
         "bb_max": bb_max, "bb_min": bb_min, "stress_avg": stress_avg, "stress_max": stress_max,
         "spo2_avg": spo2_avg, "hrv_value": hrv_value, "resp_avg": resp_avg,
@@ -156,7 +173,7 @@ def fetch_day_data(garmin, date_str):
 
 def write_to_sheet(worksheet, date_str, data, existing_dates):
     if data["steps"] == 0 and data["total_score"] == 0 and data["bb_max"] == 0:
-        print("  -> Skip (No Data)")
+        print(" -> Skip (No Data)")
         return
 
     data_map = {
@@ -166,7 +183,7 @@ def write_to_sheet(worksheet, date_str, data, existing_dates):
         43: data["floors"], 44: data["intensity_min"], 45: data["resting_hr"], 46: data["max_hr"],
         47: data["avg_hr"], 48: data["bb_max"], 49: data["bb_min"], 50: data["stress_avg"],
         51: data["stress_max"], 52: data["spo2_avg"], 53: data["hrv_value"], 54: data["resp_avg"],
-        55: data["weight_kg"], 56: data["body_fat"], 57: data["vo2max"]
+        55: data["weight_kg"], 56: data["body_fat"], 57: data["vo2max"], 58: data["vo2max_cycling"]
     }
 
     try:
@@ -176,7 +193,7 @@ def write_to_sheet(worksheet, date_str, data, existing_dates):
             worksheet.update_cells(cells)
             print("  -> Updated")
         else:
-            row_values = [""] * 57
+            row_values = [""] * 58
             row_values[0] = date_str
             for col, val in data_map.items():
                 row_values[col-1] = val
@@ -188,11 +205,11 @@ def write_to_sheet(worksheet, date_str, data, existing_dates):
 
 def main():
     print("--- Starting Daily Fetch ---")
-    
+
     token_str = os.getenv("GARMIN_TOKENS")
     if not token_str:
         print("Error: GARMIN_TOKENS environment variable is missing.")
-        # sys.exit(1)
+        sys.exit(1)
 
     try:
         garmin = Garmin()
@@ -212,7 +229,7 @@ def main():
     if not json_str:
         print("Error: SERVICE_ACCOUNT_JSON environment variable is missing.")
         sys.exit(1)
-    
+
     try:
         creds_dict = json.loads(json_str)
         creds = Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/spreadsheets"])
@@ -226,7 +243,7 @@ def main():
     existing = {v: i+1 for i, v in enumerate(vals) if len(v) >= 10}
 
     targets = [date.today() - timedelta(days=1), date.today()]
-    
+
     for d_obj in targets:
         d_str = d_obj.isoformat()
         try:
