@@ -155,7 +155,7 @@ def main():
     try:
         creds_dict = json.loads(json_str)
         creds = Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/spreadsheets"])
-        gc = gspread.authorize(creds)
+        gc = gspread.Client(auth=creds)
         # using the second worksheet (index 1) for Toggl data
         sheet = gc.open_by_key(SPREADSHEET_ID)
         try:
