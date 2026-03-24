@@ -3,7 +3,6 @@ import os
 import sys
 import time
 import json
-import tempfile
 import traceback
 from datetime import datetime, date, timedelta
 from garminconnect import Garmin
@@ -561,19 +560,12 @@ def main():
         print("Error: SERVICE_ACCOUNT_JSON missing")
         sys.exit(1)
     
-    try:
-        if len(token_str) > 1000 and token_str.startswith('{'):
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-                f.write(token_str)
-                token_file = f.name
-            print("Token saved to temp file")
-            
-            garmin = Garmin()
-            garmin.login(token_file)
-            os.unlink(token_file)
-        else:
-            garmin = Garmin()
-            garmin.login(token_str)
+        try:
+        garmin = Garmin()
+        # GitHub Secrets strips trailing '=' base64 padding — restore it
+        padded = token_str.strip() + "=" * (-len(token_str.strip()) % 4)
+        garmin.garth.loads(padded)
+
             
         try:
             profile = garmin.connectapi("/userprofile-service/userprofile/profile")
@@ -590,7 +582,7 @@ def main():
     try:
         creds_dict = json.loads(json_str)
         creds = Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/spreadsheets"])
-        gc = gspread.authorize(creds)
+        gc = gspread.Client(auth=creds)
         worksheet = gc.open_by_key(SPREADSHEET_ID).get_worksheet(0)
     except Exception as e:
         print(f"Sheets connection failed: {e}")
