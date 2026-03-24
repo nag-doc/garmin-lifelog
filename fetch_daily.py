@@ -560,18 +560,18 @@ def main():
         print("Error: SERVICE_ACCOUNT_JSON missing")
         sys.exit(1)
     
-        try:
+    try:
         garmin = Garmin()
         # GitHub Secrets strips trailing '=' base64 padding — restore it
         padded = token_str.strip() + "=" * (-len(token_str.strip()) % 4)
         garmin.garth.loads(padded)
 
             
-        try:
+    try:
             profile = garmin.connectapi("/userprofile-service/userprofile/profile")
             if profile and "displayName" in profile:
                 garmin.display_name = profile["displayName"]
-        except:
+    except:
             pass
         print(f"Logged in as: {garmin.display_name}")
     except Exception as e:
