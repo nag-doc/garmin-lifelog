@@ -12,7 +12,7 @@ email = input("Email: ")
 password = getpass.getpass("Password: ")
 
 try:
-    garmin = Garmin(email, password, is_cn=False, prompt_mfa=lambda: input("MFA Code: "))
+    garmin = Garmin(email, password, is_cn=False)
     garmin.login()
     print("\n" + "="*60)
     print("↓ 以下の文字列をすべてコピーしてください (GARMIN_TOKENS) ↓")
