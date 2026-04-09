@@ -13,11 +13,13 @@ DATA_DIR = "data/fit"
 GID = "674362661"
 
 # Column Mapping (Target Sheet Column Index 1-based)
+# J:10, K:11, L:12, M:13, O:15
 COLUMN_MAP = {
-    "steps": 39,
-    "distance_km": 40,
-    "calories": 41,
-    "active_cal": 42
+    "steps": 10,
+    "distance_km": 11,
+    "calories": 12,
+    "active_cal": 13,
+    "rhr": 15
 }
 
 def extract_daily_stats():
