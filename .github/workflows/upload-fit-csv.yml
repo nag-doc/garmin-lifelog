@@ -1,0 +1,28 @@
+name: Process Uploaded Fit CSVs
+
+on:
+  push:
+    paths:
+      - 'data/fit/**/*.csv'
+  workflow_dispatch:
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pandas gspread google-auth
+
+      - name: Run Processing Script
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: python process_csv_to_sheets.py
