@@ -57,6 +57,14 @@ def extract_daily_stats():
                 print(f"Error reading {f}: {e}")
     return daily_stats
 
+def normalize_date(d_str):
+    try:
+        # Try to parse and re-format consistently
+        dt = pd.to_datetime(d_str)
+        return dt.strftime('%Y/%-m/%-d') # No leading zeros for matching if needed
+    except:
+        return d_str
+
 def main():
     print("Connecting to Google Sheets...")
     json_str = os.getenv("SERVICE_ACCOUNT_JSON")
@@ -69,8 +77,15 @@ def main():
         creds = Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/spreadsheets"])
         gc = gspread.Client(auth=creds)
         sh = gc.open_by_key(SPREADSHEET_ID)
-        worksheet = next((ws for ws in sh.worksheets() if str(ws.id) == GID), sh.get_worksheet(0))
-        print(f"Connected to: {worksheet.title}")
+        
+        # Try finding by name first, then GID
+        worksheet = None
+        try:
+            worksheet = sh.worksheet("Garmin summary")
+        except:
+            worksheet = next((ws for ws in sh.worksheets() if str(ws.id) == GID), sh.get_worksheet(0))
+            
+        print(f"Connected to worksheet: {worksheet.title} (ID: {worksheet.id})")
     except Exception as e:
         print(f"Connection failed: {e}")
         return
@@ -80,15 +95,23 @@ def main():
         print("No CSV data found to process.")
         return
 
-    # Get existing dates in column 1
+    # Get existing dates in column 1 and normalize them
     existing_vals = worksheet.col_values(1)
-    existing_dates = {v: i+1 for i, v in enumerate(existing_vals) if v}
+    # Map both original and normalized to the row index
+    existing_dates = {}
+    for i, v in enumerate(existing_vals):
+        if not v: continue
+        existing_dates[v] = i + 1
+        existing_dates[normalize_date(v)] = i + 1
 
     print(f"Processing {len(daily_data)} days...")
     for date_str, stats in daily_data.items():
-        row_num = existing_dates.get(date_str)
+        # Try matching original then normalized
+        row_num = existing_dates.get(date_str) or existing_dates.get(normalize_date(date_str))
+        
         if not row_num:
-            print(f"[{date_str}] Row not found. Skipping.")
+            # Last ditch effort: partial match or print for debug
+            print(f"[{date_str}] Row not found. Normalized: {normalize_date(date_str)}. Skipping.")
             continue
         
         updates = []
